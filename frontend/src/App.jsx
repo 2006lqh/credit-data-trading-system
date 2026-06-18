@@ -141,7 +141,17 @@ function makeRecord(prefix, namePrefix, index, level, overrides = {}) {
 }
 
 function repeatLevels(groups) {
-  return groups.flatMap(([level, count]) => Array(count).fill(level));
+  const normalized = groups.map(([level, count]) => ({ level, count }));
+  const maxCount = Math.max(...normalized.map((item) => item.count));
+  const levels = [];
+  for (let index = 0; index < maxCount; index += 1) {
+    normalized.forEach((item) => {
+      if (index < item.count) {
+        levels.push(item.level);
+      }
+    });
+  }
+  return levels;
 }
 
 function buildCase(prefix, namePrefix, levels, options = {}) {
@@ -150,6 +160,19 @@ function buildCase(prefix, namePrefix, levels, options = {}) {
     records[options.tamperIndex].tamper_attempt = true;
   }
   return records;
+}
+
+function buildTradeRows(trade, assets) {
+  return assets.map((asset, index) => ({
+    序号: index + 1,
+    交易编号: `${trade.trade_id}-${String(index + 1).padStart(3, "0")}`,
+    客户名: asset.customer_name || asset.customer_id,
+    数据资产编号: asset.data_id,
+    用途: trade.purpose || "credit_risk_rating",
+    支付状态: "已支付",
+    交易状态: "已创建",
+    创建时间: trade.created_at || ""
+  }));
 }
 
 const cases = [
@@ -479,7 +502,7 @@ export default function App() {
       updateStep("trade", {
         status: "完成",
         summary: `已创建并支付 ${records.length} 笔交易。`,
-        detail: trade
+        detail: buildTradeRows(trade, imported.assets)
       });
       setProgress(45);
 
@@ -967,12 +990,13 @@ nav button.active { background: #d6ebe7; color: #0f2b36; }
 .audit-status h3 { margin: 8px 0; font-size: 24px; }
 .audit-status p, .audit-status strong { display: block; color: #334155; line-height: 1.7; }
 .stage-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; margin-top: 18px; }
-.stage-grid button { min-height: 160px; }
+.stage-grid button { min-height: 180px; display: grid; align-content: center; gap: 10px; }
 .stage-grid span { color: #0f766e; font-weight: 900; }
-.stage-grid strong { display: block; font-size: 24px; margin: 14px 0 8px; }
-.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: grid; place-items: center; padding: 20px; z-index: 10; }
-.modal { width: min(760px, 100%); background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 30px 90px rgba(0,0,0,.26); }
-.modal.wide { width: min(980px, 100%); }
+.stage-grid strong { display: block; font-size: 24px; margin: 4px 0 0; }
+.stage-grid p { margin: 0; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.45); padding: 20px; z-index: 10; overflow: hidden; }
+.modal { position: fixed; left: 50vw; top: 50vh; transform: translate(-50%, -50%); width: min(760px, calc(100vw - 40px)); max-height: calc(100vh - 40px); background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 30px 90px rgba(0,0,0,.26); display: flex; flex-direction: column; }
+.modal.wide { width: min(1120px, calc(100vw - 40px)); }
 .modal h3 { font-size: 28px; margin: 18px 0 10px; }
 .modal p { font-size: 18px; line-height: 1.65; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px; }
@@ -980,7 +1004,7 @@ nav button.active { background: #d6ebe7; color: #0f2b36; }
 .alarm-dot { background: #fee2e2; color: #b91c1c; }
 .success-dot { background: #dcfce7; color: #15803d; }
 .modal-eyebrow { display: block; margin-bottom: 10px; }
-.detail-table { overflow: auto; max-height: 420px; border: 1px solid #e5e7eb; border-radius: 8px; }
+.detail-table { overflow: auto; max-height: min(460px, 54vh); min-height: 0; width: 100%; max-width: 100%; border: 1px solid #e5e7eb; border-radius: 8px; }
 table { width: 100%; border-collapse: collapse; background: #fff; }
 th, td { border-bottom: 1px solid #e5e7eb; padding: 10px 12px; text-align: left; white-space: nowrap; }
 th { background: #f8fafc; color: #334155; }
