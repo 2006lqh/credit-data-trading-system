@@ -9,6 +9,7 @@
 ## 功能特性
 
 - **数据导入**：支持 CSV 和 JSON 格式的征信记录导入。
+- **案例数据库**：内置简易样本、稳定还款、轻度波动、多指标混合、逾期客户和高负债高查询等多类批量案例。
 - **批量评级**：支持一次性处理多个客户并生成信用评级。
 - **加密存证**：为导入数据生成哈希、签名和可信资产记录。
 - **交易模拟**：模拟可信数据交易创建、授权签名和状态流转。
@@ -77,6 +78,7 @@ render.yaml            云端服务配置文件
 
 ```text
 customer_id
+customer_name
 overdue_count_12m
 credit_card_repayment_rate
 loan_count
@@ -86,12 +88,14 @@ recent_credit_inquiries_3m
 income_level
 ```
 
+案例数据库中还包含 age、city_tier、region、job_type、employment_years、mortgage_status、credit_history_months、monthly_income、available_credit_limit、existing_credit_products、public_record_flag、last_loan_status、bank_relationship_years 等客户画像字段，用于展示更接近真实数据库宽表的导入效果。评分计算仍以前述征信核心字段为准，扩展字段用于展示、留痕和审计。
+
 CSV 示例：
 
 ```csv
-customer_id,overdue_count_12m,credit_card_repayment_rate,loan_count,credit_utilization,debt_to_income_ratio,recent_credit_inquiries_3m,income_level
-CUST-001,0,0.98,1,0.20,0.25,0,high
-CUST-002,1,0.82,4,0.58,0.42,2,medium
+customer_id,customer_name,overdue_count_12m,credit_card_repayment_rate,loan_count,credit_utilization,debt_to_income_ratio,recent_credit_inquiries_3m,income_level,age,city_tier,job_type,monthly_income
+CUST-001,稳定客户001,0,0.98,1,0.20,0.25,0,high,32,新一线城市,国企事业,12600
+CUST-002,波动客户002,1,0.95,3,0.35,0.30,1,medium,41,二线城市,制造业,9800
 ```
 
 JSON 示例：
@@ -100,13 +104,18 @@ JSON 示例：
 [
   {
     "customer_id": "CUST-001",
+    "customer_name": "稳定客户001",
     "overdue_count_12m": 0,
     "credit_card_repayment_rate": 0.98,
     "loan_count": 1,
     "credit_utilization": 0.20,
     "debt_to_income_ratio": 0.25,
     "recent_credit_inquiries_3m": 0,
-    "income_level": "high"
+    "income_level": "high",
+    "age": 32,
+    "city_tier": "新一线城市",
+    "job_type": "国企事业",
+    "monthly_income": 12600
   }
 ]
 ```
@@ -116,9 +125,8 @@ JSON 示例：
 系统根据客户征信指标计算综合信用分，并映射为以下评级：
 
 ```text
-优秀
-良好
-中等
+低风险
+中风险
 高风险
 ```
 

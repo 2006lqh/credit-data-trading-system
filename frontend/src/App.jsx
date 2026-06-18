@@ -42,13 +42,87 @@ const processCards = [
 
 const riskOrder = ["低风险", "中风险", "高风险"];
 
+const cityTiers = ["一线城市", "新一线城市", "二线城市", "三线城市", "县域城市"];
+const jobTypes = ["国企事业", "制造业", "互联网平台", "金融服务", "物流运输", "教育培训", "个体经营", "自由职业"];
+const mortgageStatuses = ["无房贷", "按揭正常", "房贷结清", "租住"];
+const productMixes = ["信用卡+消费贷", "信用卡+车贷", "消费贷+经营贷", "信用卡+按揭贷", "信用卡+小额贷", "综合授信"];
+const regions = ["华东", "华南", "华中", "华北", "西南", "西北"];
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function fixed(value) {
+  return Number(value.toFixed(2));
+}
+
+function makeProfile(index, level) {
+  const isHigh = level === "high" || level === "overdue" || level === "debt";
+  return {
+    age: 24 + (index % 35),
+    city_tier: cityTiers[index % cityTiers.length],
+    region: regions[index % regions.length],
+    job_type: jobTypes[index % jobTypes.length],
+    employment_years: clamp(1 + (index % 19), 1, 25),
+    mortgage_status: mortgageStatuses[index % mortgageStatuses.length],
+    credit_history_months: isHigh ? 18 + (index % 72) : 48 + (index % 156),
+    monthly_income: isHigh ? 4200 + (index % 18) * 360 : 7600 + (index % 26) * 520,
+    available_credit_limit: isHigh ? 12000 + (index % 20) * 1500 : 36000 + (index % 35) * 2600,
+    existing_credit_products: productMixes[index % productMixes.length],
+    public_record_flag: isHigh && index % 7 === 0 ? "yes" : "no",
+    last_loan_status: isHigh ? (index % 3 === 0 ? "逾期关注" : "正常结清") : "正常结清",
+    bank_relationship_years: clamp(1 + (index % 12), 1, 16)
+  };
+}
+
 function makeRecord(prefix, namePrefix, index, level, overrides = {}) {
+  const mod = index % 12;
   const presets = {
-    low: [0, 0.98, 1, 0.20, 0.18, 0, "high"],
-    medium: [1, 0.93, 2, 0.35, 0.30, 1, "medium"],
-    high: [5, 0.52, 9, 0.86, 0.76, 5, "low"],
-    overdue: [6, 0.42, 7, 0.76, 0.68, 4, "low"],
-    debt: [2, 0.72, 8, 0.88, 0.78, 6, "medium"]
+    low: [
+      0,
+      fixed(0.96 + (mod % 4) * 0.01),
+      1 + (mod % 2),
+      fixed(0.18 + (mod % 5) * 0.025),
+      fixed(0.16 + (mod % 5) * 0.025),
+      mod % 2,
+      mod % 5 === 0 ? "medium" : "high"
+    ],
+    medium: [
+      1,
+      fixed(0.95 + (mod % 2) * 0.01),
+      2 + (mod % 2),
+      fixed(0.30 + (mod % 3) * 0.025),
+      fixed(0.24 + (mod % 4) * 0.02),
+      1,
+      "medium"
+    ],
+    high: [
+      3 + (mod % 3),
+      fixed(0.55 + (mod % 5) * 0.04),
+      6 + (mod % 5),
+      fixed(0.72 + (mod % 5) * 0.04),
+      fixed(0.62 + (mod % 5) * 0.05),
+      3 + (mod % 4),
+      mod % 2 === 0 ? "low" : "medium"
+    ],
+    overdue: [
+      3 + (mod % 5),
+      fixed(0.40 + (mod % 6) * 0.045),
+      6 + (mod % 6),
+      fixed(0.70 + (mod % 5) * 0.045),
+      fixed(0.62 + (mod % 6) * 0.055),
+      4 + (mod % 5),
+      mod % 3 === 0 ? "low" : "medium"
+    ],
+    debt: [
+      1 + (mod % 3),
+      fixed(0.67 + (mod % 5) * 0.035),
+      7 + (mod % 6),
+      fixed(0.80 + (mod % 5) * 0.035),
+      fixed(0.70 + (mod % 6) * 0.04),
+      5 + (mod % 5),
+      "medium"
+    ]
   };
   const [overdue, repay, loans, util, debt, inquiries, income] = presets[level];
   return {
@@ -61,37 +135,17 @@ function makeRecord(prefix, namePrefix, index, level, overrides = {}) {
     debt_to_income_ratio: debt,
     recent_credit_inquiries_3m: inquiries,
     income_level: income,
+    ...makeProfile(index, level),
     ...overrides
   };
 }
 
+function repeatLevels(groups) {
+  return groups.flatMap(([level, count]) => Array(count).fill(level));
+}
+
 function buildCase(prefix, namePrefix, levels, options = {}) {
-  const records = levels.map((level, index) => {
-    if (level === "overdue") {
-      const mod = index % 6;
-      return makeRecord(prefix, namePrefix, index + 1, level, {
-        overdue_count_12m: 3 + (mod % 4),
-        credit_card_repayment_rate: Number((0.42 + mod * 0.05).toFixed(2)),
-        loan_count: 7 + (mod % 5),
-        credit_utilization: Number((0.76 + (mod % 4) * 0.05).toFixed(2)),
-        debt_to_income_ratio: Number((0.68 + (mod % 5) * 0.07).toFixed(2)),
-        recent_credit_inquiries_3m: 4 + (mod % 4),
-        income_level: mod % 3 === 0 ? "low" : "medium"
-      });
-    }
-    if (level === "debt") {
-      const mod = index % 5;
-      return makeRecord(prefix, namePrefix, index + 1, level, {
-        overdue_count_12m: 1 + (mod % 3),
-        credit_card_repayment_rate: Number((0.68 + mod * 0.03).toFixed(2)),
-        loan_count: 8 + mod,
-        credit_utilization: Number((0.82 + mod * 0.03).toFixed(2)),
-        debt_to_income_ratio: Number((0.70 + mod * 0.05).toFixed(2)),
-        recent_credit_inquiries_3m: 5 + mod
-      });
-    }
-    return makeRecord(prefix, namePrefix, index + 1, level);
-  });
+  const records = levels.map((level, index) => makeRecord(prefix, namePrefix, index + 1, level));
   if (options.tamperIndex !== undefined && records[options.tamperIndex]) {
     records[options.tamperIndex].tamper_attempt = true;
   }
@@ -105,10 +159,12 @@ const cases = [
     tone: "mixed",
     format: "CSV",
     coverage: "低 / 中 / 高",
-    description: "少量客户覆盖低风险、中风险和高风险，适合快速检查评级结果是否完整。",
-    records: buildCase("CUST-SIMPLE", "样本客户", [
-      "low", "medium", "high", "low", "medium", "high", "low", "medium", "high"
-    ])
+    description: "三类评级客户均衡分布，适合快速检查批量评级结果是否完整。",
+    records: buildCase("CUST-SIMPLE", "样本客户", repeatLevels([
+      ["low", 12],
+      ["medium", 12],
+      ["high", 12]
+    ]))
   },
   {
     name: "正常案例：稳定还款客户",
@@ -116,8 +172,8 @@ const cases = [
     tone: "normal",
     format: "CSV",
     coverage: "低风险",
-    description: "批量低风险征信记录，适合演示较完整的数据导入、加密和评级输出。",
-    records: buildCase("CUST-NORMAL", "稳定客户", Array(48).fill("low"))
+    description: "稳定还款、信用历史较长的批量客户库，适合演示低风险集中评级。",
+    records: buildCase("CUST-NORMAL", "稳定客户", Array(120).fill("low"))
   },
   {
     name: "正常案例：轻度波动客户",
@@ -125,11 +181,11 @@ const cases = [
     tone: "normal",
     format: "JSON",
     coverage: "低 / 中",
-    description: "中低风险混合记录，用于展示系统对 JSON 数据库导出的自动识别。",
-    records: buildCase("CUST-FLOAT", "波动客户", [
-      ...Array(24).fill("low"),
-      ...Array(16).fill("medium")
-    ])
+    description: "轻度逾期和授信波动客户混合记录，用于展示 JSON 批量导入。",
+    records: buildCase("CUST-FLOAT", "波动客户", repeatLevels([
+      ["low", 72],
+      ["medium", 36]
+    ]))
   },
   {
     name: "复杂案例：多指标混合客户库",
@@ -138,11 +194,11 @@ const cases = [
     format: "JSON",
     coverage: "低 / 中 / 高",
     description: "多字段、多等级、大批量客户库，用于展示一次导入后批量生成不同风险评级。",
-    records: buildCase("CUST-MIX", "混合客户", [
-      ...Array(18).fill("low"),
-      ...Array(18).fill("medium"),
-      ...Array(18).fill("high")
-    ])
+    records: buildCase("CUST-MIX", "混合客户", repeatLevels([
+      ["low", 60],
+      ["medium", 60],
+      ["high", 60]
+    ]))
   },
   {
     name: "高风险案例：逾期客户库",
@@ -150,8 +206,8 @@ const cases = [
     tone: "danger",
     format: "CSV",
     coverage: "高风险",
-    description: "批量逾期和高负债记录，用于一次性输出多名客户的高风险评级。",
-    records: buildCase("CUST-WARN-OD", "逾期客户", Array(42).fill("overdue"))
+    description: "逾期、负债和近期查询偏高的客户库，用于一次性输出多名客户的高风险评级。",
+    records: buildCase("CUST-WARN-OD", "逾期客户", Array(150).fill("overdue"))
   },
   {
     name: "复杂高风险案例：高负债高查询客户",
@@ -159,11 +215,11 @@ const cases = [
     tone: "danger",
     format: "JSON",
     coverage: "中 / 高",
-    description: "高查询、高授信使用率记录，用于批量客户评级和 PDF 输出。",
-    records: buildCase("CUST-WARN-DEBT", "高负债客户", [
-      ...Array(18).fill("medium"),
-      ...Array(24).fill("debt")
-    ])
+    description: "高查询、高授信使用率和较高债务收入比记录，用于复杂客户库批量评级。",
+    records: buildCase("CUST-WARN-DEBT", "高负债客户", repeatLevels([
+      ["medium", 48],
+      ["debt", 96]
+    ]))
   }
 ];
 
@@ -178,6 +234,19 @@ function toCsv(records) {
     "debt_to_income_ratio",
     "recent_credit_inquiries_3m",
     "income_level",
+    "age",
+    "city_tier",
+    "region",
+    "job_type",
+    "employment_years",
+    "mortgage_status",
+    "credit_history_months",
+    "monthly_income",
+    "available_credit_limit",
+    "existing_credit_products",
+    "public_record_flag",
+    "last_loan_status",
+    "bank_relationship_years",
     "tamper_attempt"
   ];
   return [
@@ -685,7 +754,7 @@ export default function App() {
                 </article>
                 <article>
                   <strong>推荐字段</strong>
-                  <p>customer_id、customer_name、overdue_count_12m、credit_card_repayment_rate、loan_count、credit_utilization、debt_to_income_ratio、recent_credit_inquiries_3m、income_level。</p>
+                  <p>customer_id、customer_name、overdue_count_12m、credit_card_repayment_rate、loan_count、credit_utilization、debt_to_income_ratio、recent_credit_inquiries_3m、income_level。可附加 age、city_tier、job_type、monthly_income、credit_history_months 等客户画像字段。</p>
                 </article>
               </div>
             </section>
