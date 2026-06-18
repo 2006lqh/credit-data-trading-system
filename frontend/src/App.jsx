@@ -140,16 +140,13 @@ function makeRecord(prefix, namePrefix, index, level, overrides = {}) {
   };
 }
 
-function repeatLevels(groups) {
-  const normalized = groups.map(([level, count]) => ({ level, count }));
-  const maxCount = Math.max(...normalized.map((item) => item.count));
-  const levels = [];
-  for (let index = 0; index < maxCount; index += 1) {
-    normalized.forEach((item) => {
-      if (index < item.count) {
-        levels.push(item.level);
-      }
-    });
+function repeatLevels(groups, seed = 17) {
+  const levels = groups.flatMap(([level, count]) => Array(count).fill(level));
+  let state = seed;
+  for (let index = levels.length - 1; index > 0; index -= 1) {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    const swapIndex = state % (index + 1);
+    [levels[index], levels[swapIndex]] = [levels[swapIndex], levels[index]];
   }
   return levels;
 }
@@ -187,7 +184,7 @@ const cases = [
       ["low", 12],
       ["medium", 12],
       ["high", 12]
-    ]))
+    ], 241))
   },
   {
     name: "正常案例：稳定还款客户",
@@ -208,7 +205,7 @@ const cases = [
     records: buildCase("CUST-FLOAT", "波动客户", repeatLevels([
       ["low", 72],
       ["medium", 36]
-    ]))
+    ], 613))
   },
   {
     name: "复杂案例：多指标混合客户库",
@@ -221,7 +218,7 @@ const cases = [
       ["low", 60],
       ["medium", 60],
       ["high", 60]
-    ]))
+    ], 947))
   },
   {
     name: "高风险案例：逾期客户库",
@@ -242,7 +239,7 @@ const cases = [
     records: buildCase("CUST-WARN-DEBT", "高负债客户", repeatLevels([
       ["medium", 48],
       ["debt", 96]
-    ]))
+    ], 379))
   }
 ];
 
