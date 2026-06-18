@@ -1,0 +1,10 @@
+.venv/
+frontend/node_modules/
+frontend/dist/
+backend/__pycache__/
+backend/credit_trade.db
+**/__pycache__/
+**/*.pyc
+*.zip
+*.pdf
+*.docx
